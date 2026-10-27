@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { createElement, useMemo } from 'react';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 type Props = {
@@ -16,13 +16,15 @@ function buildHtml(
   positions: string[],
   shelves: number[],
 ): string {
-  const posSel = positions.map((p) => `[data-pos="${p}"]`).join(',');
+  const posSel = positions
+    .map((p) => `[data-pos="${p.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`)
+    .join(',');
   const shelfSel = shelves.map((s) => `[data-shelf="${s}"]`).join(',');
   const selectors = [posSel, shelfSel].filter(Boolean).join(',');
 
   const css = `
-    html, body { margin: 0; padding: 0; background: #fafafa; }
-    svg { width: 100%; height: auto; display: block; }
+    html, body { margin: 0; padding: 8px; background: #fafafa; }
+    svg { width: 100%; height: auto; display: block; max-height: 100%; }
     @keyframes maydayBlink {
       0%, 100% { opacity: 1; filter: drop-shadow(0 0 2px #f59e0b); }
       50% { opacity: 0.35; }
@@ -40,9 +42,39 @@ function buildHtml(
   `;
 
   return `<!DOCTYPE html><html><head>
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <style>${css}</style>
   </head><body>${svg}</body></html>`;
+}
+
+function SvgFrame({ html, height }: { html: string; height: number }) {
+  // react-native-webview does not support web — use a real iframe there.
+  if (Platform.OS === 'web') {
+    return createElement('iframe', {
+      srcDoc: html,
+      title: 'Shelf map',
+      style: {
+        width: '100%',
+        height,
+        border: 'none',
+        display: 'block',
+        background: '#fafafa',
+      },
+      sandbox: 'allow-same-origin',
+    });
+  }
+
+  return (
+    <WebView
+      originWhitelist={['*']}
+      source={{ html }}
+      style={styles.web}
+      scrollEnabled={false}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+    />
+  );
 }
 
 export function ShelfHighlight({
@@ -52,9 +84,13 @@ export function ShelfHighlight({
   highlightShelves = [],
   height = 220,
 }: Props) {
+  const posKey = highlightPositions.join('|');
+  const shelfKey = highlightShelves.join('|');
   const html = useMemo(
     () => buildHtml(svgMarkup, highlightPositions, highlightShelves),
-    [svgMarkup, highlightPositions.join('|'), highlightShelves.join('|')],
+    // Keys capture array identity for highlighting; markup is the map body.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [svgMarkup, posKey, shelfKey],
   );
 
   if (!svgMarkup) {
@@ -69,14 +105,7 @@ export function ShelfHighlight({
     <View style={styles.wrap}>
       <Text style={styles.title}>{title}</Text>
       <View style={[styles.box, { height }]}>
-        <WebView
-          originWhitelist={['*']}
-          source={{ html }}
-          style={styles.web}
-          scrollEnabled={false}
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-        />
+        <SvgFrame html={html} height={height} />
       </View>
     </View>
   );

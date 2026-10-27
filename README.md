@@ -29,7 +29,7 @@ npx expo start --port 19077
 
 1. Create a Supabase project.
 2. Run `supabase/migrations/001_init.sql` in the SQL editor (schema, indexes, RLS, inventory stub tables).
-3. Create a public Storage bucket named `product-thumbs` (or let the seed script create it).
+3. Create a **public** Storage bucket named `product-thumbs` in the dashboard (recommended). The seed script will try to create it; if Storage returns `PGRST125` / “Invalid path”, create the bucket manually then re-run.
 4. Copy `.env.example` → `.env` and set:
    - `EXPO_PUBLIC_SUPABASE_URL`
    - `EXPO_PUBLIC_SUPABASE_ANON_KEY`

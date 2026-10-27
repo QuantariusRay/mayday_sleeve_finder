@@ -13,6 +13,7 @@ import { Link, router, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FilterBar } from '../components/FilterBar';
 import { ProductCard } from '../components/ProductCard';
+import { useAuth } from '../lib/AuthContext';
 import { useCatalog } from '../lib/CatalogContext';
 import { filterProducts } from '../lib/filter';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -31,6 +32,7 @@ function defaultFilters(tol: number): FinderFilters {
 export default function FinderScreen() {
   const { catalog, loading, error, refresh, theme, copy, header, filtersConfig, card } =
     useCatalog();
+  const { isAdmin } = useAuth();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const columns = width < 360 ? 1 : 2;
@@ -57,11 +59,20 @@ export default function FinderScreen() {
         options={{
           title: header.title,
           headerRight: () => (
-            <Link href="/admin" asChild>
-              <Pressable hitSlop={10} style={styles.adminLink}>
-                <Text style={[styles.adminText, { color: theme.accent }]}>Admin</Text>
-              </Pressable>
-            </Link>
+            <View style={styles.headerRight}>
+              <Link href="/shelves" asChild>
+                <Pressable hitSlop={10} style={styles.adminLink}>
+                  <Text style={[styles.adminText, { color: theme.accent }]}>Shelves</Text>
+                </Pressable>
+              </Link>
+              <Link href={isAdmin ? '/admin' : '/admin/login'} asChild>
+                <Pressable hitSlop={10} style={styles.adminLink}>
+                  <Text style={[styles.adminText, { color: theme.accent }]}>
+                    {isAdmin ? 'Admin' : 'Login'}
+                  </Text>
+                </Pressable>
+              </Link>
+            </View>
           ),
         }}
       />
@@ -143,6 +154,7 @@ export default function FinderScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   adminLink: { paddingHorizontal: 8, paddingVertical: 4 },
   adminText: { fontWeight: '700', fontSize: 15 },
   banner: {

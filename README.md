@@ -64,12 +64,19 @@ values ('<auth-user-uuid>', 'you@example.com', 'admin');
 | Route | Purpose |
 |-------|---------|
 | `/` | Sleeve finder: search, W×H ±tol, Standard/Premium, results grid |
+| `/shelves` | Shelf view: floor layout + per-shelf cards |
+| `/shelves/[id]` | One shelf: SVG map + SKUs/placements |
 | `/product/[sku]` | Detail: positions, layout + shelf SVG highlight, pack photo, external link |
+| `/admin/login` | Staff login (Supabase) or **demo admin** when env unset |
 | `/admin` | Authenticated product/placement list |
-| `/admin/login` | Email/password |
+| `/admin/shelves` | Configure shelves (maps + placements) |
+| `/admin/shelves/[id]` | Edit one shelf’s SVG + add/remove slots |
+| `/admin/layout-map` | Edit floor layout SVG |
 | `/admin/product/[id]` | Create/edit product + thumb upload |
 | `/admin/placement/[id]` | Edit/delete placement |
 | `/admin/display` | Edit `display_config` JSON |
+
+**Rights:** only users in `admin_users` (or demo admin locally) can edit shelf layouts. Everyone can browse `/shelves`.
 
 ## Seed provenance
 

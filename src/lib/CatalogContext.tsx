@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { loadCatalog } from './catalog';
+import { mergeLocalOverrides } from './localOverrides';
 import type { CatalogSnapshot, DisplayConfigPayload } from './types';
 
 type CatalogContextValue = {
@@ -40,7 +41,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const snap = await loadCatalog();
-      setCatalog(snap);
+      const merged = await mergeLocalOverrides(snap);
+      setCatalog(merged);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load catalog');
     } finally {

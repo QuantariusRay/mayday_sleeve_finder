@@ -103,7 +103,7 @@ export function ShelfHighlight({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>{title}</Text>
+      {title ? <Text style={styles.title}>{title}</Text> : null}
       <View style={[styles.box, { height }]}>
         <SvgFrame html={html} height={height} />
       </View>

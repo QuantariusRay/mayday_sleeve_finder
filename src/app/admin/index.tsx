@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,45 +9,30 @@ import {
   View,
 } from 'react-native';
 import { Link, router, Stack } from 'expo-router';
-import {
-  getSession,
-  isCurrentUserAdmin,
-  signOut,
-} from '../../lib/auth';
+import { useAuth } from '../../lib/AuthContext';
 import { useCatalog } from '../../lib/CatalogContext';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { Product } from '../../lib/types';
 
 export default function AdminHomeScreen() {
   const { catalog, refresh, theme } = useCatalog();
-  const [checking, setChecking] = useState(true);
-  const [allowed, setAllowed] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
+  const { loading, isAdmin, isMockAdmin, email, signOut } = useAuth();
   const [busySku, setBusySku] = useState<string | null>(null);
 
-  const gate = useCallback(async () => {
-    setChecking(true);
-    if (!isSupabaseConfigured) {
-      setAllowed(false);
-      setChecking(false);
-      return;
-    }
-    const session = await getSession();
-    if (!session) {
-      router.replace('/admin/login');
-      return;
-    }
-    setEmail(session.user.email ?? null);
-    const ok = await isCurrentUserAdmin();
-    setAllowed(ok);
-    setChecking(false);
-  }, []);
-
   useEffect(() => {
-    void gate();
-  }, [gate]);
+    if (!loading && !isAdmin) {
+      router.replace('/admin/login');
+    }
+  }, [loading, isAdmin]);
 
   const deactivate = async (product: Product) => {
+    if (!isSupabaseConfigured || isMockAdmin) {
+      Alert.alert(
+        'Needs Supabase',
+        'Product deactivate writes to Postgres. Configure Supabase or edit the seed offline.',
+      );
+      return;
+    }
     const supabase = getSupabase();
     if (!supabase) return;
     setBusySku(product.sku);
@@ -65,47 +50,10 @@ export default function AdminHomeScreen() {
     }
   };
 
-  if (checking) {
+  if (loading || !isAdmin) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={theme.accent} />
-      </View>
-    );
-  }
-
-  if (!isSupabaseConfigured) {
-    return (
-      <View style={styles.wrap}>
-        <Text style={styles.title}>Admin needs Supabase</Text>
-        <Text style={styles.body}>
-          Configure env vars, run migrations, seed the catalog, add your user to{' '}
-          <Text style={styles.mono}>admin_users</Text>, then sign in.
-        </Text>
-        <Link href="/admin/login" asChild>
-          <Pressable style={[styles.btn, { backgroundColor: theme.accent }]}>
-            <Text style={styles.btnText}>Open login</Text>
-          </Pressable>
-        </Link>
-      </View>
-    );
-  }
-
-  if (!allowed) {
-    return (
-      <View style={styles.wrap}>
-        <Text style={styles.title}>Not an admin</Text>
-        <Text style={styles.body}>
-          Signed in as {email ?? 'unknown'}, but no matching row in admin_users.
-        </Text>
-        <Pressable
-          style={[styles.btn, { backgroundColor: theme.accent }]}
-          onPress={async () => {
-            await signOut();
-            router.replace('/admin/login');
-          }}
-        >
-          <Text style={styles.btnText}>Sign out</Text>
-        </Pressable>
       </View>
     );
   }
@@ -132,11 +80,24 @@ export default function AdminHomeScreen() {
       />
 
       <View style={styles.toolbar}>
-        <Text style={styles.subtle}>{email}</Text>
+        <Text style={styles.subtle}>
+          {email}
+          {isMockAdmin ? ' · demo admin' : ''}
+        </Text>
         <View style={styles.toolbarRow}>
+          <Link href="/admin/shelves" asChild>
+            <Pressable style={[styles.chip, styles.chipPrimary]}>
+              <Text style={[styles.chipText, styles.chipPrimaryText]}>Shelves</Text>
+            </Pressable>
+          </Link>
+          <Link href="/admin/layout-map" asChild>
+            <Pressable style={styles.chip}>
+              <Text style={styles.chipText}>Floor layout</Text>
+            </Pressable>
+          </Link>
           <Link href="/admin/display" asChild>
             <Pressable style={styles.chip}>
-              <Text style={styles.chipText}>Display config</Text>
+              <Text style={styles.chipText}>Display</Text>
             </Pressable>
           </Link>
           <Pressable
@@ -194,8 +155,8 @@ export default function AdminHomeScreen() {
         )}
         ListFooterComponent={
           <View style={{ marginTop: 16, gap: 8 }}>
-            <Text style={styles.section}>Placements</Text>
-            {placements.slice(0, 40).map((pl) => (
+            <Text style={styles.section}>Recent placements</Text>
+            {placements.slice(0, 30).map((pl) => (
               <Pressable
                 key={pl.position_code}
                 style={styles.placeRow}
@@ -209,9 +170,6 @@ export default function AdminHomeScreen() {
                 <Text style={styles.meta}>{pl.sku}</Text>
               </Pressable>
             ))}
-            {placements.length > 40 ? (
-              <Text style={styles.subtle}>Showing first 40 placements…</Text>
-            ) : null}
           </View>
         }
       />
@@ -222,13 +180,13 @@ export default function AdminHomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f4f4f5' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  wrap: { flex: 1, padding: 20, gap: 12 },
-  title: { fontSize: 22, fontWeight: '800' },
-  body: { color: '#52525b', lineHeight: 20 },
-  mono: { fontFamily: 'monospace' },
-  btn: { borderRadius: 10, padding: 14, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: '800' },
-  toolbar: { padding: 12, gap: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e4e4e7' },
+  toolbar: {
+    padding: 12,
+    gap: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e4e4e7',
+  },
   toolbarRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   chip: {
     backgroundColor: '#e0e7ff',
@@ -236,7 +194,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
   },
+  chipPrimary: { backgroundColor: '#1d4ed8' },
   chipText: { fontWeight: '700', color: '#1e3a8a' },
+  chipPrimaryText: { color: '#fff' },
   section: { fontWeight: '800', color: '#27272a', marginTop: 4 },
   subtle: { color: '#71717a', fontSize: 12 },
   row: {

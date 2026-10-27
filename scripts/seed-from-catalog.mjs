@@ -21,12 +21,42 @@ const root = join(__dirname, '..');
 const catalogPath = join(root, 'seed', 'catalog.json');
 const thumbsDir = join(root, 'seed', 'thumbs');
 
+/** Load repo-root .env into process.env (Expo does this for the app; Node seed does not). */
+function loadEnvFile() {
+  const envPath = join(root, '.env');
+  if (!existsSync(envPath)) return;
+  const text = readFileSync(envPath, 'utf8');
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const keyName = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[keyName] === undefined) {
+      process.env[keyName] = value;
+    }
+  }
+}
+
+loadEnvFile();
+
 const url = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!url || !key) {
+  const missing = [];
+  if (!url) missing.push('EXPO_PUBLIC_SUPABASE_URL (or SUPABASE_URL)');
+  if (!key) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  console.error(`Missing in .env (or environment): ${missing.join(', ')}`);
   console.error(
-    'Missing SUPABASE_URL (or EXPO_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY.',
+    'Anon key is for the app only. Seeding needs the service_role key from Supabase → Project Settings → API.',
   );
   process.exit(1);
 }

@@ -33,8 +33,8 @@ npx expo start --port 19077
 4. Copy `.env.example` → `.env` and set:
    - `EXPO_PUBLIC_SUPABASE_URL`
    - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (seed script only)
-5. Seed:
+   - `SUPABASE_SERVICE_ROLE_KEY` (**required for seed** — service_role from Project Settings → API, not the anon key)
+5. Seed (script loads `.env` from the repo root):
 
 ```bash
 npm run seed

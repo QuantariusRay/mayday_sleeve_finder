@@ -11,6 +11,7 @@ import {
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FloorLayoutView } from '../../components/FloorLayoutView';
 import { PositionBadges } from '../../components/PositionBadges';
 import { ShelfHighlight } from '../../components/ShelfHighlight';
 import { useCatalog } from '../../lib/CatalogContext';
@@ -101,12 +102,12 @@ export default function ProductDetailScreen() {
         </View>
       ) : null}
 
-      {blocks.includes('layout_map') && catalog?.layoutMap ? (
-        <ShelfHighlight
+      {blocks.includes('layout_map') ? (
+        <FloorLayoutView
           title="Floor layout"
-          svgMarkup={catalog.layoutMap}
+          layoutMap={catalog?.layoutMap}
           highlightShelves={shelves}
-          height={140}
+          height={160}
         />
       ) : null}
 

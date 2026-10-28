@@ -71,7 +71,7 @@ values ('<auth-user-uuid>', 'you@example.com', 'admin');
 | `/admin` | Authenticated product/placement list |
 | `/admin/shelves` | Configure shelves (maps + placements) |
 | `/admin/shelves/[id]` | Edit one shelf’s SVG + add/remove slots |
-| `/admin/layout-map` | Edit floor layout SVG |
+| `/admin/layout-map` | Drag/rotate triangular carousel racks and assign shelf faces |
 | `/admin/product/[id]` | Create/edit product + thumb upload |
 | `/admin/placement/[id]` | Edit/delete placement |
 | `/admin/display` | Edit `display_config` JSON |

@@ -86,8 +86,17 @@ export default function AdminHomeScreen() {
         </Text>
         <View style={styles.toolbarRow}>
           <Link href="/admin/shelves" asChild>
-            <Pressable style={[styles.chip, styles.chipPrimary]}>
-              <Text style={[styles.chipText, styles.chipPrimaryText]}>Shelves</Text>
+            <Pressable
+              style={StyleSheet.flatten([styles.chip, styles.chipPrimary])}
+            >
+              <Text
+                style={StyleSheet.flatten([
+                  styles.chipText,
+                  styles.chipPrimaryText,
+                ])}
+              >
+                Shelves
+              </Text>
             </Pressable>
           </Link>
           <Link href="/admin/layout-map" asChild>

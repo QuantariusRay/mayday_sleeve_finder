@@ -8,7 +8,19 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "seed": "node scripts/seed-from-catalog.mjs"
+    "seed": "node scripts/seed-from-catalog.mjs",
+    "eas:login": "npx eas-cli@latest login",
+    "eas:init": "npx eas-cli@latest init",
+    "eas:configure": "npx eas-cli@latest build:configure",
+    "build:dev:android": "npx eas-cli@latest build --platform android --profile development",
+    "build:dev:ios": "npx eas-cli@latest build --platform ios --profile development",
+    "build:preview:android": "npx eas-cli@latest build --platform android --profile preview",
+    "build:preview:ios": "npx eas-cli@latest build --platform ios --profile preview",
+    "build:prod:android": "npx eas-cli@latest build --platform android --profile production",
+    "build:prod:ios": "npx eas-cli@latest build --platform ios --profile production",
+    "build:prod:all": "npx eas-cli@latest build --platform all --profile production",
+    "submit:android": "npx eas-cli@latest submit --platform android --profile production",
+    "submit:ios": "npx eas-cli@latest submit --platform ios --profile production"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -16,6 +28,7 @@
     "babel-preset-expo": "~58.0.0",
     "expo": "~58.0.17",
     "expo-constants": "~58.0.13",
+    "expo-dev-client": "~58.0.16",
     "expo-file-system": "~58.0.10",
     "expo-image": "~58.0.16",
     "expo-image-picker": "~58.0.10",

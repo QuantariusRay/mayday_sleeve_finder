@@ -34,6 +34,15 @@ yarn-error.*
 .env
 .env*.local
 
+# EAS / native credentials (never commit)
+credentials.json
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
 # typescript
 *.tsbuildinfo
 

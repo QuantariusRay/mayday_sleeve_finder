@@ -1,11 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { CatalogSnapshot, Placement } from './types';
+import type { CatalogSnapshot, Placement, SavedLayout } from './types';
 
 const KEY = 'mayday.localOverrides.v1';
 
 export type LocalOverrides = {
   shelfMaps?: Record<string, string>;
   layoutMap?: string;
+  /** Named floor layouts for offline / mock admin. */
+  savedLayouts?: SavedLayout[];
   /** Replaces all placements when set (full list). */
   placements?: Placement[];
 };

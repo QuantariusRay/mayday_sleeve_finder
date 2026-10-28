@@ -8,6 +8,7 @@ Greenfield Expo (React Native) sleeve finder for warehouse / shop-floor lookup o
 
 - **Client:** Expo SDK 58 + Expo Router + TypeScript
 - **Backend:** Supabase (Postgres + Auth + Storage) when configured
+- **Native builds / store submit:** [EAS Build](https://docs.expo.dev/build/setup/) + EAS Submit (not Heroku — Heroku cannot produce iOS/Android binaries)
 - **Offline / Expo Go:** checked-in mock seed (`src/data/seed-catalog.json` + `assets/thumbs/`) — no secrets required
 
 ## Quick start (mock / Expo Go)
@@ -38,8 +39,10 @@ npx expo start --port 19077
 
 ```bash
 npm run seed
-# or skip Storage uploads: SEED_SKIP_THUMBS=1 npm run seed
+# catalog only (no Storage): SEED_SKIP_THUMBS=1 npm run seed
 ```
+
+URL must be exactly `https://<project-ref>.supabase.co` (no trailing slash / path).
 
 6. Create an Auth user (email/password) in Supabase Auth.
 7. Insert that user into `admin_users`:
@@ -84,6 +87,70 @@ values ('<auth-user-uuid>', 'you@example.com', 'admin');
 - `seed/thumbs/` — JPEG pack photos extracted for Storage upload
 - `assets/thumbs/` + `src/data/localThumbs.ts` — Metro-friendly local thumbs for mock mode (binary assets, not a 3 MB base64 blob in JS)
 
-## Out of scope (MVP)
+## Build & deploy (Android + iOS)
 
-App Store / Play submission, inventory UX (tables exist unused), barcode scan, pricing/cart.
+**Do not use Heroku for the mobile app.** Heroku hosts web/API processes; native installs need EAS cloud builders (or local Xcode / Android Studio). Keep Supabase as the backend; optionally use Heroku later only for a separate web admin if you want.
+
+### One-time setup (on your machine)
+
+1. Expo account: [expo.dev](https://expo.dev) → sign up.
+2. From the repo:
+
+```bash
+npm install
+npx eas-cli@latest login
+npx eas-cli@latest init          # links project; commits extra.eas.projectId
+```
+
+3. Put Supabase public env on EAS (so cloud builds get them — `.env` is gitignored):
+
+```bash
+npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_URL --value 'https://YOUR.supabase.co' --environment production --visibility plaintext
+npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value 'your-anon-key' --environment production --visibility sensitive
+# repeat with --environment preview and --environment development as needed
+```
+
+4. **Android Play:** Google Play Console account (~$25 one-time).  
+   **iOS App Store:** Apple Developer Program (~$99/year) — required for device/App Store builds (simulator profile works without store submit).
+
+### Profiles (`eas.json`)
+
+| Profile | What you get |
+|---------|----------------|
+| `development` | Dev client + Expo Go–like workflow (`expo-dev-client`); Android APK; iOS Simulator |
+| `preview` | Internal installable builds (APK / ad-hoc) for warehouse testing |
+| `production` | Play `.aab` + App Store `.ipa` |
+
+```bash
+# Try on a device / simulator first
+npm run build:preview:android
+npm run build:preview:ios
+
+# Store-ready
+npm run build:prod:android
+npm run build:prod:ios
+# or both: npm run build:prod:all
+```
+
+EAS will prompt to create Android keystore / iOS credentials the first time (let it manage them unless you already have store certs).
+
+### Submit to stores
+
+```bash
+npm run submit:android   # needs Play service account linked in EAS
+npm run submit:ios       # needs Apple / ASC API credentials
+```
+
+Or upload the artifacts from the EAS build page manually.
+
+### OTA JS updates (optional later)
+
+Production/preview profiles set Update `channel`s. After a native binary is installed:
+
+```bash
+npx eas-cli@latest update --channel production --message "fix finder copy"
+```
+
+## Out of scope (still)
+
+Inventory UX (tables exist unused), barcode scan, pricing/cart. Store listing assets / review screenshots are on you when you submit.

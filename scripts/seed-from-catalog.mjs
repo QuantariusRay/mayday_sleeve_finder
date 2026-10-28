@@ -47,12 +47,12 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-const url = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
+const rawUrl = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!url || !key) {
+if (!rawUrl || !key) {
   const missing = [];
-  if (!url) missing.push('EXPO_PUBLIC_SUPABASE_URL (or SUPABASE_URL)');
+  if (!rawUrl) missing.push('EXPO_PUBLIC_SUPABASE_URL (or SUPABASE_URL)');
   if (!key) missing.push('SUPABASE_SERVICE_ROLE_KEY');
   console.error(`Missing in .env (or environment): ${missing.join(', ')}`);
   console.error(
@@ -61,23 +61,69 @@ if (!url || !key) {
   process.exit(1);
 }
 
+const url = String(rawUrl).trim().replace(/\/+$/, '');
+if (!/^https:\/\//i.test(url)) {
+  console.warn('Warning: SUPABASE URL should be https://…supabase.co — got:', url);
+}
+
 const skipThumbs = process.env.SEED_SKIP_THUMBS === '1';
 const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
-const supabase = createClient(url, key, { auth: { persistSession: false } });
+const supabase = createClient(url, key, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 const BUCKET = 'product-thumbs';
 
+function storageHeaders(extra = {}) {
+  return {
+    Authorization: `Bearer ${key}`,
+    apikey: key,
+    ...extra,
+  };
+}
+
 async function ensureBucket() {
-  const { data: buckets, error } = await supabase.storage.listBuckets();
-  if (error) throw error;
-  if (!buckets?.some((b) => b.id === BUCKET || b.name === BUCKET)) {
-    const { error: createErr } = await supabase.storage.createBucket(BUCKET, {
-      public: true,
-      fileSizeLimit: 5_000_000,
-    });
-    if (createErr) throw createErr;
-    console.log('Created storage bucket', BUCKET);
+  // Prefer Storage REST — client listBuckets() can return PGRST125 on some setups.
+  const listRes = await fetch(`${url}/storage/v1/bucket`, {
+    headers: storageHeaders(),
+  });
+  if (!listRes.ok) {
+    const body = await listRes.text();
+    throw new Error(
+      `Cannot list storage buckets (${listRes.status}): ${body}\n` +
+        `Create a public bucket named "${BUCKET}" in Supabase → Storage, then re-run.\n` +
+        `Or catalog-only: SEED_SKIP_THUMBS=1 npm run seed`,
+    );
   }
+  const buckets = await listRes.json();
+  const exists = Array.isArray(buckets)
+    ? buckets.some((b) => b.id === BUCKET || b.name === BUCKET)
+    : false;
+  if (exists) {
+    console.log('Storage bucket exists:', BUCKET);
+    return;
+  }
+
+  const createRes = await fetch(`${url}/storage/v1/bucket`, {
+    method: 'POST',
+    headers: storageHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      id: BUCKET,
+      name: BUCKET,
+      public: true,
+      file_size_limit: 5_000_000,
+    }),
+  });
+  if (!createRes.ok) {
+    const body = await createRes.text();
+    if (createRes.status !== 409 && !/already exists/i.test(body)) {
+      throw new Error(
+        `Cannot create bucket "${BUCKET}" (${createRes.status}): ${body}\n` +
+          `Create it manually in Supabase → Storage (Public), then re-run.`,
+      );
+    }
+  }
+  console.log('Created storage bucket', BUCKET);
 }
 
 async function uploadThumb(sku, relativePath) {
@@ -89,9 +135,12 @@ async function uploadThumb(sku, relativePath) {
   }
   const bytes = readFileSync(local);
   const ext = relativePath.split('.').pop() || 'jpg';
-  const objectPath = `${sku}.${ext}`;
+  const safeSku = sku.replace(/[^A-Za-z0-9_-]/g, '_');
+  const objectPath = `packs/${safeSku}.${ext}`;
   const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
-  const { error } = await supabase.storage.from(BUCKET).upload(objectPath, bytes, {
+  const body = new Blob([bytes], { type: contentType });
+
+  const { error } = await supabase.storage.from(BUCKET).upload(objectPath, body, {
     contentType,
     upsert: true,
   });
@@ -102,18 +151,46 @@ async function uploadThumb(sku, relativePath) {
 
 async function main() {
   console.log('Seeding from', catalogPath);
+  console.log('Project URL:', url);
   console.log('Products:', catalog.products.length, 'Placements:', catalog.placements.length);
 
-  if (!skipThumbs) {
-    await ensureBucket();
+  let uploadThumbs = !skipThumbs;
+  if (skipThumbs) {
+    console.log('SEED_SKIP_THUMBS=1 — keeping relative thumb_path values');
+  } else {
+    try {
+      await ensureBucket();
+    } catch (err) {
+      console.error('\nStorage setup failed — continuing without thumb uploads.');
+      console.error(String(err?.message || err));
+      console.error(
+        `\nFix: Dashboard → Storage → New bucket → "${BUCKET}" → Public, then re-run.\n` +
+          `Or: SEED_SKIP_THUMBS=1 npm run seed\n`,
+      );
+      uploadThumbs = false;
+    }
   }
 
   const skuToId = new Map();
+  let uploaded = 0;
+  let thumbErrors = 0;
 
   for (const p of catalog.products) {
     let thumbPath = p.thumb_path;
-    if (!skipThumbs && p.thumb_path) {
-      thumbPath = await uploadThumb(p.sku, p.thumb_path);
+    if (uploadThumbs && p.thumb_path) {
+      try {
+        thumbPath = await uploadThumb(p.sku, p.thumb_path);
+        uploaded += 1;
+        if (uploaded % 25 === 0) console.log(`  uploaded ${uploaded} thumbs…`);
+      } catch (err) {
+        thumbErrors += 1;
+        console.warn(`Thumb upload failed for ${p.sku}:`, err?.message || err);
+        thumbPath = p.thumb_path;
+        if (thumbErrors >= 3) {
+          console.warn('Multiple thumb failures — skipping remaining uploads.');
+          uploadThumbs = false;
+        }
+      }
     }
 
     const row = {
@@ -139,9 +216,12 @@ async function main() {
     if (error) throw error;
     skuToId.set(data.sku, data.id);
   }
-  console.log('Upserted products', skuToId.size);
+  console.log(
+    'Upserted products',
+    skuToId.size,
+    `(thumbs uploaded: ${uploaded}, failures: ${thumbErrors})`,
+  );
 
-  // Replace placements (stable position_code)
   const placementRows = catalog.placements
     .map((pl) => {
       const product_id = skuToId.get(pl.sku);

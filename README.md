@@ -6,13 +6,10 @@ Warehouse / shop-floor app for looking up **Mayday** and **Sleeve Kings** packs:
 
 ## Stack
 
-| Layer | Choice |
-|-------|--------|
-| Client | Expo SDK 58 + Expo Router + TypeScript |
-| Backend | Supabase (Postgres + Auth + Storage) when configured |
-| Offline | Checked-in mock seed — works in Expo Go with no secrets |
-
-IDs already set for later native builds: `xyz.mayday.sleevefinder` (iOS + Android).
+- **Client:** Expo SDK 58 + Expo Router + TypeScript
+- **Backend:** Supabase (Postgres + Auth + Storage)
+- **Native builds / store submit:** [EAS Build](https://docs.expo.dev/build/setup/) + EAS Submit
+- **Offline / Expo Go:** checked-in mock seed (`src/data/seed-catalog.json` + `assets/thumbs/`) — no secrets required
 
 ## Quick start (mock / Expo Go)
 
@@ -30,8 +27,8 @@ npx expo start --port 19077   # optional uncommon port
 ## Supabase setup (live catalog + admin)
 
 1. Create a Supabase project.
-2. Run `supabase/migrations/001_init.sql` in the SQL editor.
-3. Create a public Storage bucket named `product-thumbs` (or let the seed script create it).
+2. Run `supabase/migrations/001_init.sql` in the SQL editor (schema, indexes, RLS, inventory stub tables).
+3. Create a **public** Storage bucket named `product-thumbs` in the dashboard (recommended). The seed script will try to create it; if Storage returns `PGRST125` / “Invalid path”, create the bucket manually then re-run.
 4. Copy `.env.example` → `.env` and set:
    - `EXPO_PUBLIC_SUPABASE_URL` — project root only, e.g. `https://xxxx.supabase.co` (**not** `.../rest/v1/`)
    - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — anon / public key
@@ -40,8 +37,10 @@ npx expo start --port 19077   # optional uncommon port
 
 ```bash
 npm run seed
-# or skip Storage uploads: SEED_SKIP_THUMBS=1 npm run seed
+# catalog only (no Storage): SEED_SKIP_THUMBS=1 npm run seed
 ```
+
+URL must be exactly `https://<project-ref>.supabase.co` (no trailing slash / path).
 
 6. Create an Auth user (email/password) in Supabase Auth.
 7. Insert that user into `admin_users`:
@@ -114,6 +113,70 @@ Until then: Expo Go / `npx expo start`, or `npx expo run:ios` / `run:android` wi
 
 BGG’s **official XML API2** can resolve games but **does not expose sleeve/card-set data**. Sleeve data on BGG game pages is loaded via internal endpoints that are **not licensed for third-party apps** (BGG ToS). For game→sleeve recommendations later, prefer Mayday / Sleeve Kings’ own sleeves-by-game data (or a first-party mapping), not unofficial BGG JSON/geekdo APIs.
 
-## Out of scope (current MVP)
+## Build & deploy (Android + iOS)
 
-Store submission, inventory UX (tables exist unused), barcode scan, pricing/cart, BGG-integrated sleeve lookup.
+**Do not use Heroku for the mobile app.** Heroku hosts web/API processes; native installs need EAS cloud builders (or local Xcode / Android Studio). Keep Supabase as the backend; optionally use Heroku later only for a separate web admin if you want.
+
+### One-time setup (on your machine)
+
+1. Expo account: [expo.dev](https://expo.dev) → sign up.
+2. From the repo:
+
+```bash
+npm install
+npx eas-cli@latest login
+npx eas-cli@latest init          # links project; commits extra.eas.projectId
+```
+
+3. Put Supabase public env on EAS (so cloud builds get them — `.env` is gitignored):
+
+```bash
+npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_URL --value 'https://YOUR.supabase.co' --environment production --visibility plaintext
+npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value 'your-anon-key' --environment production --visibility sensitive
+# repeat with --environment preview and --environment development as needed
+```
+
+4. **Android Play:** Google Play Console account (~$25 one-time).  
+   **iOS App Store:** Apple Developer Program (~$99/year) — required for device/App Store builds (simulator profile works without store submit).
+
+### Profiles (`eas.json`)
+
+| Profile | What you get |
+|---------|----------------|
+| `development` | Dev client + Expo Go–like workflow (`expo-dev-client`); Android APK; iOS Simulator |
+| `preview` | Internal installable builds (APK / ad-hoc) for warehouse testing |
+| `production` | Play `.aab` + App Store `.ipa` |
+
+```bash
+# Try on a device / simulator first
+npm run build:preview:android
+npm run build:preview:ios
+
+# Store-ready
+npm run build:prod:android
+npm run build:prod:ios
+# or both: npm run build:prod:all
+```
+
+EAS will prompt to create Android keystore / iOS credentials the first time (let it manage them unless you already have store certs).
+
+### Submit to stores
+
+```bash
+npm run submit:android   # needs Play service account linked in EAS
+npm run submit:ios       # needs Apple / ASC API credentials
+```
+
+Or upload the artifacts from the EAS build page manually.
+
+### OTA JS updates (optional later)
+
+Production/preview profiles set Update `channel`s. After a native binary is installed:
+
+```bash
+npx eas-cli@latest update --channel production --message "fix finder copy"
+```
+
+## Out of scope (still)
+
+Inventory UX (tables exist unused), barcode scan, pricing/cart. Store listing assets / review screenshots are on you when you submit.

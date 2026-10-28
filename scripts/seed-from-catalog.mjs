@@ -268,6 +268,35 @@ async function main() {
   if (layoutErr) throw layoutErr;
   console.log('Upserted layout map');
 
+  // Named copy of the live floor plan (requires 002_saved_layouts.sql).
+  const layoutName = 'Essen 2026';
+  const { data: existingLayouts, error: listLayoutErr } = await supabase
+    .from('saved_layouts')
+    .select('id, name');
+  if (listLayoutErr) {
+    console.warn(
+      'saved_layouts missing or unreadable — run supabase/migrations/002_saved_layouts.sql',
+      listLayoutErr.message,
+    );
+  } else {
+    const hit = (existingLayouts ?? []).find(
+      (r) => String(r.name).trim().toLowerCase() === layoutName.toLowerCase(),
+    );
+    if (hit) {
+      const { error } = await supabase
+        .from('saved_layouts')
+        .update({ name: layoutName, svg_markup: catalog.layout_map })
+        .eq('id', hit.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('saved_layouts')
+        .insert({ name: layoutName, svg_markup: catalog.layout_map });
+      if (error) throw error;
+    }
+    console.log('Upserted saved layout', layoutName);
+  }
+
   const dc = catalog.display_config;
   const { error: dcErr } = await supabase.from('display_config').upsert(
     {

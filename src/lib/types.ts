@@ -76,6 +76,14 @@ export type CatalogSnapshot = {
   displayConfig: DisplayConfig;
 };
 
+/** Named floor layout snapshot (Admin → Floor layout). */
+export type SavedLayout = {
+  id: string;
+  name: string;
+  svg_markup: string;
+  updated_at: string;
+};
+
 export type FinderFilters = {
   query: string;
   width: string;

@@ -29,7 +29,7 @@ npx expo start --port 19077
 ## Supabase setup (live catalog + admin)
 
 1. Create a Supabase project.
-2. Run `supabase/migrations/001_init.sql` in the SQL editor (schema, indexes, RLS, inventory stub tables).
+2. Run `supabase/migrations/001_init.sql` then `002_saved_layouts.sql` in the SQL editor (schema, indexes, RLS, inventory stub tables, named layouts).
 3. Create a **public** Storage bucket named `product-thumbs` in the dashboard (recommended). The seed script will try to create it; if Storage returns `PGRST125` / “Invalid path”, create the bucket manually then re-run.
 4. Copy `.env.example` → `.env` and set:
    - `EXPO_PUBLIC_SUPABASE_URL`
@@ -59,8 +59,16 @@ values ('<auth-user-uuid>', 'you@example.com', 'admin');
 | Table | Anon / public | Admin (`admin_users`) |
 |-------|---------------|------------------------|
 | `products` (active) | SELECT | ALL |
-| `shelf_placements`, `shelf_maps`, `layout_map`, `display_config` | SELECT | ALL |
+| `shelf_placements`, `shelf_maps`, `layout_map`, `display_config`, `saved_layouts` | SELECT | ALL |
 | Inventory stubs | — | ALL |
+
+## Floor layout
+
+Physical racks are modeled as **two triangular-prism carousels** (three faces each — like a carousel that doesn’t spin).
+
+- **Staff** see a top-down map on `/shelves` and product detail; faces carry `data-shelf` for blink highlight.
+- **Admin → Floor layout** (`/admin/layout-map`): drag hubs A/B, rotate ±30°, tap a face then an S# chip to assign shelves. **Save named layout** stores event setups (e.g. Essen 2026, PaxU) in `saved_layouts`; **Publish live** writes the active booth map to `layout_map`.
+- Live layout SVG embeds JSON (`data-mayday-layout`) so the editor can round-trip. See `src/lib/floorLayout.ts`.
 
 ## App map
 

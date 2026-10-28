@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,20 +6,26 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
-import { ShelfHighlight } from '../../components/ShelfHighlight';
+import { FloorLayoutEditor } from '../../components/FloorLayoutEditor';
+import { FloorLayoutView } from '../../components/FloorLayoutView';
 import { useAuth } from '../../lib/AuthContext';
 import { useCatalog } from '../../lib/CatalogContext';
+import {
+  DEFAULT_FLOOR_LAYOUT,
+  floorLayoutToSvg,
+  resolveFloorLayout,
+  type FloorLayout,
+} from '../../lib/floorLayout';
 import { saveLocalLayoutMap } from '../../lib/localOverrides';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 
 export default function AdminLayoutMapScreen() {
   const { catalog, refresh, theme } = useCatalog();
   const { loading: authLoading, isAdmin, isMockAdmin } = useAuth();
-  const [svg, setSvg] = useState('');
+  const [layout, setLayout] = useState<FloorLayout>(DEFAULT_FLOOR_LAYOUT);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -29,14 +35,17 @@ export default function AdminLayoutMapScreen() {
       return;
     }
     if (catalog) {
-      setSvg(catalog.layoutMap ?? '');
+      setLayout(resolveFloorLayout(catalog.layoutMap));
       setReady(true);
     }
   }, [authLoading, isAdmin, catalog]);
 
+  const previewSvg = useMemo(() => floorLayoutToSvg(layout), [layout]);
+
   const save = async () => {
     setBusy(true);
     try {
+      const svg = floorLayoutToSvg(layout);
       if (isSupabaseConfigured && !isMockAdmin) {
         const supabase = getSupabase();
         if (!supabase) throw new Error('Supabase client missing');
@@ -56,6 +65,10 @@ export default function AdminLayoutMapScreen() {
     }
   };
 
+  const reset = () => {
+    setLayout(DEFAULT_FLOOR_LAYOUT);
+  };
+
   if (!ready || authLoading) {
     return (
       <View style={styles.center}>
@@ -67,49 +80,52 @@ export default function AdminLayoutMapScreen() {
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
       <Stack.Screen options={{ title: 'Floor layout' }} />
-      <Text style={styles.hint}>
-        Mini floor / rack overview SVG. Use data-shelf=&quot;N&quot; on edges/labels so product
-        detail can blink the right shelf.
+      <Text style={styles.lead}>
+        Each rack is a triangular prism with three faces (like a carousel that doesn&apos;t
+        move). Place the two carousels on the floor, rotate them, and assign S1–S6 to each
+        face.
       </Text>
-      <ShelfHighlight title="Preview" svgMarkup={svg} height={160} />
-      <TextInput
-        style={styles.editor}
-        multiline
-        autoCorrect={false}
-        autoCapitalize="none"
-        value={svg}
-        onChangeText={setSvg}
-        textAlignVertical="top"
-      />
-      <Pressable
-        style={[styles.btn, { backgroundColor: theme.accent }]}
-        onPress={() => void save()}
-        disabled={busy}
-      >
-        {busy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.btnText}>Save layout</Text>
-        )}
-      </Pressable>
+
+      <FloorLayoutEditor layout={layout} onChange={setLayout} accent={theme.accent} />
+
+      <Text style={styles.previewLabel}>Staff preview</Text>
+      <FloorLayoutView layout={layout} layoutMap={previewSvg} title="" height={160} />
+
+      <View style={styles.actions}>
+        <Pressable style={styles.secondary} onPress={reset}>
+          <Text style={styles.secondaryText}>Reset default</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.btn, { backgroundColor: theme.accent }]}
+          onPress={() => void save()}
+          disabled={busy}
+        >
+          {busy ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.btnText}>Save layout</Text>
+          )}
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  wrap: { padding: 14, gap: 12, paddingBottom: 40 },
-  hint: { color: '#52525b', lineHeight: 20 },
-  editor: {
-    minHeight: 220,
-    borderWidth: 1,
-    borderColor: '#d4d4d8',
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: '#fff',
-    fontFamily: 'monospace',
-    fontSize: 12,
-  },
+  wrap: { padding: 14, gap: 12, paddingBottom: 48 },
+  lead: { color: '#52525b', lineHeight: 20 },
+  previewLabel: { fontWeight: '800', color: '#27272a', marginTop: 4 },
+  actions: { gap: 10, marginTop: 4 },
   btn: { borderRadius: 10, padding: 14, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  secondary: {
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d4d4d8',
+  },
+  secondaryText: { fontWeight: '700', color: '#3f3f46' },
 });

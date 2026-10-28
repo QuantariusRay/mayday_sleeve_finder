@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FloorLayoutView } from '../../components/FloorLayoutView';
 import { ShelfHighlight } from '../../components/ShelfHighlight';
 import { useCatalog } from '../../lib/CatalogContext';
 import { listShelfIds, placementsOnShelf } from '../../lib/shelves';
@@ -36,13 +37,11 @@ export default function ShelvesScreen() {
               <Text style={styles.lead}>
                 Browse physical shelves. Tap a shelf for its map and SKUs.
               </Text>
-              {catalog?.layoutMap ? (
-                <ShelfHighlight
-                  title="Floor layout"
-                  svgMarkup={catalog.layoutMap}
-                  height={150}
-                />
-              ) : null}
+              <FloorLayoutView
+                title="Floor layout"
+                layoutMap={catalog?.layoutMap}
+                height={170}
+              />
             </View>
           }
           renderItem={({ item: shelf }) => {
